@@ -33,7 +33,19 @@ enum SellerStatus {
   SUSPENDED
 }
 
-// ─── Core models ──────────────────────────────────────────────────────────────
+enum NotificationType {
+  ORDER_PLACED
+  ORDER_PAID
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  NEW_MESSAGE
+  NEW_REVIEW
+  PAYOUT_SENT
+  SELLER_APPROVED
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
 
 model User {
   id         String   @id @default(cuid())
@@ -45,36 +57,66 @@ model User {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  seller    SellerProfile?
-  orders    Order[]
-  reviews   Review[]
-  addresses Address[]
+  seller              SellerProfile?
+  orders              Order[]
+  reviews             Review[]
+  addresses           Address[]
+  cart                Cart?
+  favorites           Favorite[]
+  sentMessages        Message[]
+  buyerConversations  Conversation[] @relation("BuyerConversations")
+  notifications       Notification[]
 
   @@map("users")
 }
 
-model SellerProfile {
-  id                    String       @id @default(cuid())
-  userId                String       @unique @map("user_id")
-  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shopName              String       @unique @map("shop_name")
-  slug                  String       @unique
-  bio                   String?
-  avatarUrl             String?      @map("avatar_url")
-  bannerUrl             String?      @map("banner_url")
-  country               String
-  currency              String       @default("EUR")
-  status                SellerStatus @default(PENDING)
-  stripeAccountId       String?      @unique @map("stripe_account_id")
-  stripeOnboardingDone  Boolean      @default(false) @map("stripe_onboarding_done")
-  commissionRate        Decimal      @default(0.05) @map("commission_rate") @db.Decimal(5, 4)
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
+// ─── Sellers ──────────────────────────────────────────────────────────────────
 
-  listings Listing[]
+model SellerProfile {
+  id                   String       @id @default(cuid())
+  userId               String       @unique @map("user_id")
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopName             String       @unique @map("shop_name")
+  slug                 String       @unique
+  bio                  String?
+  avatarUrl            String?      @map("avatar_url")
+  bannerUrl            String?      @map("banner_url")
+  country              String
+  currency             String       @default("EUR")
+  status               SellerStatus @default(PENDING)
+  stripeAccountId      String?      @unique @map("stripe_account_id")
+  stripeOnboardingDone Boolean      @default(false) @map("stripe_onboarding_done")
+  // Platform commission taken before paying out to seller (0.05 = 5%)
+  commissionRate       Decimal      @default(0.05) @map("commission_rate") @db.Decimal(5, 4)
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  listings      Listing[]
+  sections      ShopSection[]
+  conversations Conversation[] @relation("SellerConversations")
 
   @@map("seller_profiles")
 }
+
+// Sellers group their listings into sections (like Etsy shop sections)
+model ShopSection {
+  id        String        @id @default(cuid())
+  sellerId  String        @map("seller_id")
+  seller    SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  position  Int           @default(0)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  listings Listing[]
+
+  @@unique([sellerId, slug])
+  @@index([sellerId])
+  @@map("shop_sections")
+}
+
+// ─── Catalogue ────────────────────────────────────────────────────────────────
 
 model Category {
   id          String     @id @default(cuid())
@@ -97,24 +139,38 @@ model Listing {
   seller      SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   categoryId  String?       @map("category_id")
   category    Category?     @relation(fields: [categoryId], references: [id])
+  sectionId   String?       @map("section_id")
+  section     ShopSection?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   title       String
   slug        String        @unique
   description String
+  // Base price used when no variant is selected. Stored in smallest currency unit (cents).
   priceAmount Int           @map("price_amount")
   currency    String        @default("EUR")
+  // When variants exist, stock is tracked per-variant and this field is ignored.
   stock       Int           @default(1)
+  isDigital   Boolean       @default(false) @map("is_digital")
   status      ListingStatus @default(DRAFT)
   tags        String[]
+  // Soft delete — preserve FK integrity for historical orders
+  deletedAt   DateTime?     @map("deleted_at")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  images     ListingImage[]
-  orderItems OrderItem[]
-  reviews    Review[]
+  images        ListingImage[]
+  variants      ListingVariant[]
+  files         ListingFile[]
+  orderItems    OrderItem[]
+  reviews       Review[]
+  favorites     Favorite[]
+  cartItems     CartItem[]
+  conversations Conversation[]
 
   @@index([sellerId])
   @@index([categoryId])
+  @@index([sectionId])
   @@index([status])
+  @@index([deletedAt])
   @@map("listings")
 }
 
@@ -130,6 +186,72 @@ model ListingImage {
   @@index([listingId])
   @@map("listing_images")
 }
+
+// e.g. "Color: Red / Size: M". Null priceAmount means inherit from listing.
+model ListingVariant {
+  id          String   @id @default(cuid())
+  listingId   String   @map("listing_id")
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  title       String
+  priceAmount Int?     @map("price_amount")
+  stock       Int      @default(1)
+  sku         String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+
+  @@index([listingId])
+  @@map("listing_variants")
+}
+
+// Downloadable files for digital listings. Access gated to buyers post-purchase.
+model ListingFile {
+  id        String   @id @default(cuid())
+  listingId String   @map("listing_id")
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  storageUrl String  @map("storage_url")
+  fileName  String   @map("file_name")
+  fileSize  Int      @map("file_size")
+  mimeType  String?  @map("mime_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([listingId])
+  @@map("listing_files")
+}
+
+// ─── Shopping cart ────────────────────────────────────────────────────────────
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique @map("user_id")
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String          @id @default(cuid())
+  cartId    String          @map("cart_id")
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  listingId String?         @map("listing_id")
+  listing   Listing?        @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  variantId String?         @map("variant_id")
+  variant   ListingVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  quantity  Int             @default(1)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  @@index([cartId])
+  @@map("cart_items")
+}
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
 
 model Address {
   id         String   @id @default(cuid())
@@ -157,6 +279,7 @@ model Order {
   shippingAddress       Address?    @relation(fields: [shippingAddressId], references: [id])
   status                OrderStatus @default(PENDING)
   totalAmount           Int         @map("total_amount")
+  shippingAmount        Int         @default(0) @map("shipping_amount")
   currency              String      @default("EUR")
   stripePaymentIntentId String?     @unique @map("stripe_payment_intent_id")
   stripeTaxAmount       Int?        @map("stripe_tax_amount")
@@ -171,34 +294,133 @@ model Order {
 }
 
 model OrderItem {
-  id          String   @id @default(cuid())
-  orderId     String   @map("order_id")
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  listingId   String   @map("listing_id")
-  listing     Listing  @relation(fields: [listingId], references: [id])
-  quantity    Int      @default(1)
-  unitAmount  Int      @map("unit_amount")
-  currency    String   @default("EUR")
-  sellerPayout Int     @map("seller_payout")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id      String @id @default(cuid())
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Listing FK set to null if listing is hard-deleted; snapshots preserve the receipt
+  listingId String?  @map("listing_id")
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  // Variant FK set to null if variant removed; variantTitle snapshot preserves it
+  variantId    String?         @map("variant_id")
+  variant      ListingVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  variantTitle String?         @map("variant_title")
+
+  // Snapshots of listing state at order time — receipt stays accurate after edits/deletion
+  listingTitle    String  @map("listing_title")
+  listingImageUrl String? @map("listing_image_url")
+
+  // Seller context denormalized for efficient seller dashboard queries
+  sellerId              String  @map("seller_id")
+  sellerStripeAccountId String? @map("seller_stripe_account_id")
+
+  quantity     Int      @default(1)
+  unitAmount   Int      @map("unit_amount")
+  currency     String   @default("EUR")
+  sellerPayout Int      @map("seller_payout")
+
+  // Set after Stripe transfer is created for this seller's payout
+  stripeTransferId String?  @unique @map("stripe_transfer_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  review Review?
 
   @@index([orderId])
   @@index([listingId])
+  @@index([sellerId])
   @@map("order_items")
 }
 
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+
 model Review {
+  id          String    @id @default(cuid())
+  // Gated to a completed purchase — prevents fake reviews
+  orderItemId String    @unique @map("order_item_id")
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  // Denormalized from orderItem for direct listing queries
+  listingId   String    @map("listing_id")
+  listing     Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  authorId    String    @map("author_id")
+  author      User      @relation(fields: [authorId], references: [id])
+  rating      Int
+  body        String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([listingId])
+  @@index([authorId])
+  @@map("reviews")
+}
+
+// ─── Favourites ───────────────────────────────────────────────────────────────
+
+model Favorite {
   id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   listingId String   @map("listing_id")
   listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  authorId  String   @map("author_id")
-  author    User     @relation(fields: [authorId], references: [id])
-  rating    Int
-  body      String?
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@unique([listingId, authorId])
-  @@index([listingId])
-  @@map("reviews")
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@map("favorites")
+}
+
+// ─── Messaging ────────────────────────────────────────────────────────────────
+
+// One thread per buyer↔seller pair. Optional listingId for initial context.
+model Conversation {
+  id        String        @id @default(cuid())
+  buyerId   String        @map("buyer_id")
+  buyer     User          @relation("BuyerConversations", fields: [buyerId], references: [id])
+  sellerId  String        @map("seller_id")
+  seller    SellerProfile @relation("SellerConversations", fields: [sellerId], references: [id])
+  listingId String?       @map("listing_id")
+  listing   Listing?      @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  messages Message[]
+
+  @@unique([buyerId, sellerId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String       @map("sender_id")
+  sender         User         @relation(fields: [senderId], references: [id])
+  body           String
+  readAt         DateTime?    @map("read_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String           @map("user_id")
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       NotificationType
+  title      String
+  body       String?
+  // Generic pointer to the related entity (e.g. orderId, conversationId)
+  entityType String?          @map("entity_type")
+  entityId   String?          @map("entity_id")
+  readAt     DateTime?        @map("read_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@map("notifications")
 }
