@@ -61,7 +61,6 @@ model User {
   orders              Order[]
   reviews             Review[]
   addresses           Address[]
-  cart                Cart?
   favorites           Favorite[]
   sentMessages        Message[]
   buyerConversations  Conversation[] @relation("BuyerConversations")
@@ -164,7 +163,6 @@ model Listing {
   orderItems    OrderItem[]
   reviews       Review[]
   favorites     Favorite[]
-  cartItems     CartItem[]
   conversations Conversation[]
 
   @@index([sellerId])
@@ -202,7 +200,6 @@ model ListingVariant {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   orderItems OrderItem[]
-  cartItems  CartItem[]
 
   @@index([listingId])
   @@map("listing_variants")
@@ -221,35 +218,6 @@ model ListingFile {
 
   @@index([listingId])
   @@map("listing_files")
-}
-
-// ─── Shopping cart ────────────────────────────────────────────────────────────
-
-model Cart {
-  id        String     @id @default(cuid())
-  userId    String     @unique @map("user_id")
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
-
-  items CartItem[]
-
-  @@map("carts")
-}
-
-model CartItem {
-  id        String          @id @default(cuid())
-  cartId    String          @map("cart_id")
-  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  listingId String?         @map("listing_id")
-  listing   Listing?        @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  variantId String?         @map("variant_id")
-  variant   ListingVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  quantity  Int             @default(1)
-  createdAt DateTime        @default(now()) @map("created_at")
-
-  @@index([cartId])
-  @@map("cart_items")
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
