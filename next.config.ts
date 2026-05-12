@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  typedRoutes: true,
   images: {
     remotePatterns: [
       {
@@ -11,8 +13,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    typedRoutes: true,
+  turbopack: {
+    root: path.resolve(__dirname),
   },
 };
 
