@@ -31,7 +31,7 @@ export default async function SellerDashboardPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{seller.shopName}</h1>
-          <p className="text-sm text-gray-500">artcraft.com/shop/{seller.slug}</p>
+          <p className="text-sm text-gray-500">caseros.com/shop/{seller.slug}</p>
         </div>
         <div className="flex items-center gap-3">
           <Link

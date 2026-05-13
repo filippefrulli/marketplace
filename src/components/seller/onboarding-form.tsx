@@ -95,7 +95,7 @@ export function OnboardingForm() {
         </label>
         <div className="mt-1 flex rounded-lg border border-gray-300 shadow-sm focus-within:border-gray-900 focus-within:ring-1 focus-within:ring-gray-900">
           <span className="flex items-center rounded-l-lg border-r border-gray-300 bg-gray-50 px-3 text-sm text-gray-500 select-none">
-            artcraft.com/shop/
+            caseros.com/shop/
           </span>
           <input
             ref={slugRef}

@@ -10,8 +10,8 @@ const geist = Geist({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Artcraft Marketplace",
-    default: "Artcraft Marketplace",
+    template: "%s | Caseros",
+    default: "Caseros",
   },
   description: "Discover unique handmade and craft goods from European artisans.",
 };
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geist.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col font-sans">
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -12,9 +12,10 @@ export default async function NewListingPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/seller/listings/new");
 
-  const seller = await prisma.sellerProfile.findFirst({
-    where: { user: { supabaseId: user.id } },
-  });
+  const [seller, categories] = await Promise.all([
+    prisma.sellerProfile.findFirst({ where: { user: { supabaseId: user.id } } }),
+    prisma.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  ]);
   if (!seller) redirect("/seller/onboarding");
 
   return (
@@ -25,7 +26,7 @@ export default async function NewListingPage() {
         </Link>
         <h1 className="text-2xl font-bold">New listing</h1>
       </div>
-      <ListingForm userId={user.id} />
+      <ListingForm userId={user.id} categories={categories} />
     </main>
   );
 }

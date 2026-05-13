@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 const listingSchema = z.object({
+  categoryId: z.string().min(1, "Please select a category"),
   title: z
     .string()
     .min(3, "Title must be at least 3 characters")
@@ -29,7 +30,7 @@ const listingSchema = z.object({
 export type ListingActionState = {
   error?: string;
   fieldErrors?: Partial<
-    Record<"title" | "description" | "priceEuros" | "stock", string[]>
+    Record<"title" | "description" | "priceEuros" | "stock" | "categoryId", string[]>
   >;
 } | null;
 
@@ -56,6 +57,7 @@ export async function createListing(
   if (!user) return { error: "You must be signed in." };
 
   const parsed = listingSchema.safeParse({
+    categoryId: formData.get("categoryId"),
     title: formData.get("title"),
     description: formData.get("description"),
     priceEuros: formData.get("priceEuros"),
@@ -67,7 +69,7 @@ export async function createListing(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const { title, description, priceEuros, stock, publishNow } = parsed.data;
+  const { categoryId, title, description, priceEuros, stock, publishNow } = parsed.data;
 
   const imageUrls = formData.getAll("imageUrls").map(String).filter(Boolean);
   const videoUrl = formData.get("videoUrl")?.toString() || null;
@@ -84,6 +86,7 @@ export async function createListing(
   await prisma.listing.create({
     data: {
       sellerId: seller.id,
+      categoryId,
       title,
       slug: toSlug(title),
       description,

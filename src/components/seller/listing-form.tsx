@@ -29,9 +29,10 @@ function Label({
 const inputClass =
   "mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900";
 
-type Props = { userId: string };
+type Category = { id: string; name: string };
+type Props = { userId: string; categories: Category[] };
 
-export function ListingForm({ userId }: Props) {
+export function ListingForm({ userId, categories }: Props) {
   const [state, action, isPending] = useActionState<ListingActionState, FormData>(
     createListing,
     null,
@@ -49,6 +50,26 @@ export function ListingForm({ userId }: Props) {
 
       {/* Media */}
       <MediaUploader userId={userId} onBusyChange={handleBusyChange} />
+
+      {/* Category */}
+      <div>
+        <Label htmlFor="categoryId" required>
+          Category
+        </Label>
+        <select
+          id="categoryId"
+          name="categoryId"
+          required
+          defaultValue=""
+          className={inputClass}
+        >
+          <option value="" disabled>Select a category…</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          ))}
+        </select>
+        <FieldError messages={state?.fieldErrors?.categoryId} />
+      </div>
 
       {/* Title */}
       <div>

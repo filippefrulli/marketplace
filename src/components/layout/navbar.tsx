@@ -21,7 +21,7 @@ export async function Navbar() {
           className="flex items-center gap-2 text-lg font-bold tracking-tight hover:opacity-75 transition-opacity"
         >
           <Home size={18} />
-          Artcraft
+          Caseros
         </Link>
 
         <nav className="flex items-center gap-4">

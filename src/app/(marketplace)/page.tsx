@@ -35,20 +35,7 @@ export default async function HomePage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      {/* Hero */}
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Handmade goods from European artisans
-        </h1>
-        <p className="mt-2 text-gray-500">
-          {listings.length > 0
-            ? `${listings.length} item${listings.length === 1 ? "" : "s"} available`
-            : "Be the first to list something."}
-        </p>
-      </div>
-
-      {/* Grid */}
+    <main className="mx-auto max-w-6xl px-4 py-8">
       {listings.length > 0 ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
           {listings.map((listing) => (
@@ -61,9 +48,9 @@ export default async function HomePage() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 py-24 text-center">
-          <p className="text-gray-400">No listings yet.</p>
-          <p className="mt-1 text-sm text-gray-400">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-24 text-center">
+          <p className="text-text-muted">No listings yet.</p>
+          <p className="mt-1 text-sm text-text-muted">
             Open a shop and create your first listing to get started.
           </p>
         </div>
