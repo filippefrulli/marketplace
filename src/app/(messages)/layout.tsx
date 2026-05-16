@@ -1,7 +1,10 @@
+import { Navbar } from "@/components/layout/navbar";
 import { ConversationSidebar } from "@/components/messages/conversation-sidebar";
 
 export default function MessagesLayout({ children }: { children: React.ReactNode }) {
   return (
+    <>
+    <Navbar />
     <div className="px-[200px] py-8">
       <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         {/* Left sidebar — hidden on mobile */}
@@ -20,5 +23,6 @@ export default function MessagesLayout({ children }: { children: React.ReactNode
         </div>
       </div>
     </div>
+    </>
   );
 }
