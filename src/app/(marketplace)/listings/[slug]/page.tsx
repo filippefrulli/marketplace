@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import { ListingImageCarousel } from "@/components/marketplace/listing-image-carousel";
 import { FavoriteButton } from "@/components/marketplace/favorite-button";
+import { StartConversationButton } from "@/components/messages/start-conversation-button";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -24,7 +25,7 @@ export default async function ListingPage({ params }: Props) {
   const listing = await prisma.listing.findUnique({
     where: { slug, status: "ACTIVE", deletedAt: null },
     include: {
-      seller: { select: { shopName: true, slug: true, user: { select: { supabaseId: true } } } },
+      seller: { select: { id: true, shopName: true, slug: true, user: { select: { supabaseId: true } } } },
       images: { orderBy: { position: "asc" } },
     },
   });
@@ -101,6 +102,12 @@ export default async function ListingPage({ params }: Props) {
               </>
             )}
           </div>
+
+          {user && !isOwner && (
+            <div className="mt-3">
+              <StartConversationButton sellerId={listing.seller.id} />
+            </div>
+          )}
 
           {listing.description && (
             <div className="mt-8 border-t border-gray-100 pt-6">

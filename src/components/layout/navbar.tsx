@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { UserMenu } from "./user-menu";
 import { SearchBar } from "./search-bar";
+import { ChatIcon } from "@/components/messages/chat-icon";
 import Link from "next/link";
 import { Home } from "lucide-react";
 
@@ -14,9 +15,29 @@ export async function Navbar() {
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
   const name = user?.user_metadata?.full_name as string | undefined;
 
-  const isSeller = user
-    ? !!(await prisma.sellerProfile.findFirst({ where: { user: { supabaseId: user.id } }, select: { id: true } }))
-    : false;
+  const dbUser = user
+    ? await prisma.user.findUnique({
+        where: { supabaseId: user.id },
+        select: { id: true, seller: { select: { id: true } } },
+      })
+    : null;
+
+  const isSeller = !!dbUser?.seller;
+
+  const unreadCount = dbUser
+    ? await prisma.message.count({
+        where: {
+          readAt: null,
+          senderId: { not: dbUser.id },
+          conversation: {
+            OR: [
+              { buyerId: dbUser.id },
+              ...(dbUser.seller ? [{ sellerId: dbUser.seller.id }] : []),
+            ],
+          },
+        },
+      })
+    : 0;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-bg-page/90 backdrop-blur-sm">
@@ -35,7 +56,8 @@ export async function Navbar() {
           </div>
         </div>
 
-        <nav className="flex items-center justify-end">
+        <nav className="flex items-center justify-end gap-1">
+          {user && <ChatIcon unreadCount={unreadCount} />}
           {user ? (
             <UserMenu
               avatarUrl={avatarUrl}
