@@ -81,7 +81,7 @@ export default async function HomePage({ searchParams }: Props) {
                 Dropshipping and AI-generated product images are strictly not allowed.
               </p>
               <p className="mt-4 text-xs opacity-50">
-                While we do our best to uphold these standards — if you spot an AI image or a dropshipped product, please use the report function on the listing.
+                We do our best to uphold these standards! However, if you spot an AI image or a dropshipped product, please use the report function on the listing.
               </p>
             </div>
           )}
