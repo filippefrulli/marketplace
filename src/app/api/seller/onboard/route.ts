@@ -30,6 +30,10 @@ export async function POST(request: Request) {
     businessRegNumber, contactPhone, contactEmail, safetyCompliant,
     // Shop
     shopName, slug, bio, country,
+    // Verification
+    verificationVideoUrl,
+    // Social links
+    website, instagram, tiktok, youtube, facebook,
   } = body;
 
   if (!sellerType || !shopName?.trim() || !slug?.trim() || !country) {
@@ -52,6 +56,17 @@ export async function POST(request: Request) {
     if (!safetyCompliant) {
       return NextResponse.json({ error: "Safety compliance must be confirmed" }, { status: 400 });
     }
+  }
+
+  if (!verificationVideoUrl?.trim()) {
+    return NextResponse.json({ error: "Verification video is required" }, { status: 400 });
+  }
+
+  const hasSocialLink = [website, instagram, tiktok, youtube, facebook].some((l: unknown) =>
+    typeof l === "string" && l.trim(),
+  );
+  if (!hasSocialLink) {
+    return NextResponse.json({ error: "At least one social media link is required" }, { status: 400 });
   }
 
   const slugClean = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-");
@@ -87,6 +102,16 @@ export async function POST(request: Request) {
           contactPhone: contactPhone?.trim() ?? null,
           contactEmail: contactEmail?.trim() ?? null,
           safetyCompliant: safetyCompliant ?? false,
+          verificationVideoUrl: verificationVideoUrl.trim(),
+        },
+      },
+      socialLinks: {
+        create: {
+          website: website?.trim() || null,
+          instagram: instagram?.trim() || null,
+          tiktok: tiktok?.trim() || null,
+          youtube: youtube?.trim() || null,
+          facebook: facebook?.trim() || null,
         },
       },
     },

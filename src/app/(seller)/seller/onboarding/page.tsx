@@ -21,7 +21,7 @@ export default async function SellerOnboardingPage() {
 
   return (
     <main className="mx-auto max-w-lg px-4 py-12">
-      <OnboardingForm />
+      <OnboardingForm userId={user.id} />
     </main>
   );
 }

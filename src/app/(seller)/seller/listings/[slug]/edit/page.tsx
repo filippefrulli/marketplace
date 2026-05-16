@@ -30,6 +30,9 @@ export default async function EditListingPage({ params }: Props) {
   if (!listing) notFound();
   if (listing.seller.user.supabaseId !== user.id) notFound();
 
+  const seller = await prisma.sellerProfile.findFirst({ where: { user: { supabaseId: user.id } }, select: { status: true } });
+  if (seller?.status !== "ACTIVE") redirect("/seller/dashboard");
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-12">
       <div className="mb-8 flex items-center gap-3">

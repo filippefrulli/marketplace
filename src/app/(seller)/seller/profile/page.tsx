@@ -17,6 +17,7 @@ export default async function SellerProfilePage() {
     include: { socialLinks: true },
   });
   if (!seller) redirect("/seller/onboarding");
+  if (seller.status !== "ACTIVE") redirect("/seller/dashboard");
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-12">

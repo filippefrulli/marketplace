@@ -17,6 +17,7 @@ export default async function NewListingPage() {
     prisma.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   if (!seller) redirect("/seller/onboarding");
+  if (seller.status !== "ACTIVE") redirect("/seller/dashboard");
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-12">

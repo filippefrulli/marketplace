@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { ListingCard } from "@/components/marketplace/listing-card";
 import { ShopTabs } from "@/components/marketplace/shop-tabs";
+import { MapPin, CalendarDays } from "lucide-react";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -88,8 +89,22 @@ export default async function ShopPage({ params }: Props) {
     ? PLATFORMS.filter(({ key }) => !!socialLinks[key])
     : [];
 
+  const countryName = new Intl.DisplayNames(["en"], { type: "region" }).of(seller.country) ?? seller.country;
+  const memberSince = seller.createdAt.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+
   const aboutContent = (
     <div className="max-w-2xl space-y-10">
+      <section className="flex flex-wrap gap-x-6 gap-y-2">
+        <span className="flex items-center gap-1.5 text-sm text-text-secondary">
+          <MapPin size={14} className="shrink-0 text-text-muted" />
+          {countryName}
+        </span>
+        <span className="flex items-center gap-1.5 text-sm text-text-secondary">
+          <CalendarDays size={14} className="shrink-0 text-text-muted" />
+          Member since {memberSince}
+        </span>
+      </section>
+
       {seller.bio && (
         <section>
           <h2 className="mb-3 text-sm font-semibold text-gray-900">About</h2>
@@ -123,7 +138,7 @@ export default async function ShopPage({ params }: Props) {
       )}
 
       {!seller.bio && activePlatforms.length === 0 && (
-        <p className="text-sm text-gray-400">This seller hasn't added any information yet.</p>
+        <p className="text-sm text-text-muted">This seller hasn't added any further information yet.</p>
       )}
     </div>
   );

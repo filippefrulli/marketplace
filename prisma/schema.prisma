@@ -31,6 +31,7 @@ enum SellerStatus {
   PENDING
   ACTIVE
   SUSPENDED
+  REJECTED
 }
 
 enum SellerType {
@@ -447,7 +448,9 @@ model SellerKyc {
 
   // Acknowledgements & verification
   disclaimerAcknowledged Boolean   @default(false) @map("disclaimer_acknowledged")
+  verificationVideoUrl   String?   @map("verification_video_url")
   verifiedAt             DateTime? @map("verified_at")
+  reviewNotes            String?   @map("review_notes")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

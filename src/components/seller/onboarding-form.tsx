@@ -3,13 +3,14 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  User, Store, AlertTriangle, CheckCircle, ChevronDown, Loader2,
+  User, Store, AlertTriangle, ChevronDown, Loader2, Video, X, CheckCircle,
 } from "lucide-react";
+import { uploadPrivate } from "@/lib/upload";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type SellerType = "INDIVIDUAL" | "TRADER";
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 interface FormState {
   // Step 1
@@ -32,6 +33,13 @@ interface FormState {
   slug: string;
   bio: string;
   country: string;
+  // Step 4 — verification
+  verificationVideoUrl: string;
+  website: string;
+  instagram: string;
+  tiktok: string;
+  youtube: string;
+  facebook: string;
 }
 
 const EU_COUNTRIES = [
@@ -52,6 +60,14 @@ const EU_COUNTRIES = [
   { code: "NO", name: "Norway" }, { code: "CH", name: "Switzerland" },
   { code: "IS", name: "Iceland" },
 ];
+
+const SOCIAL_PLATFORMS = [
+  { key: "website",   label: "Website",   placeholder: "https://yourwebsite.com" },
+  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/yourhandle" },
+  { key: "tiktok",    label: "TikTok",    placeholder: "https://tiktok.com/@yourhandle" },
+  { key: "youtube",   label: "YouTube",   placeholder: "https://youtube.com/@yourchannel" },
+  { key: "facebook",  label: "Facebook",  placeholder: "https://facebook.com/yourpage" },
+] as const;
 
 function toSlug(value: string) {
   return value.toLowerCase().trim()
@@ -80,7 +96,7 @@ function Field({ label, hint, required, children }: {
 
 // ─── Progress indicator ───────────────────────────────────────────────────────
 
-const STEP_LABELS = ["Account type", "Identity", "Your shop"];
+const STEP_LABELS = ["Account type", "Identity", "Your shop", "Verify craft"];
 
 function StepIndicator({ current }: { current: Step }) {
   return (
@@ -118,12 +134,18 @@ function StepIndicator({ current }: { current: Step }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function OnboardingForm() {
+export function OnboardingForm({ userId }: { userId: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const slugEdited = useRef(false);
+
+  // Video upload state
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoName, setVideoName] = useState<string | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState>({
     sellerType: null,
@@ -133,10 +155,41 @@ export function OnboardingForm() {
     businessRegNumber: "", contactPhone: "", contactEmail: "",
     safetyCompliant: false,
     shopName: "", slug: "", bio: "", country: "",
+    verificationVideoUrl: "",
+    website: "", instagram: "", tiktok: "", youtube: "", facebook: "",
   });
 
   function set(partial: Partial<FormState>) {
     setForm(prev => ({ ...prev, ...partial }));
+  }
+
+  // ── Video upload ───────────────────────────────────────────────────────────
+
+  async function handleVideoSelect(file: File) {
+    if (file.size > 100 * 1024 * 1024) {
+      setVideoError("File too large (max 100 MB)");
+      return;
+    }
+    setVideoUploading(true);
+    setVideoError(null);
+    setVideoName(file.name);
+    set({ verificationVideoUrl: "" });
+    try {
+      const url = await uploadPrivate(file, "seller-verification", userId);
+      set({ verificationVideoUrl: url });
+    } catch {
+      setVideoError("Upload failed. Please try again.");
+      setVideoName(null);
+    } finally {
+      setVideoUploading(false);
+    }
+  }
+
+  function removeVideo() {
+    set({ verificationVideoUrl: "" });
+    setVideoName(null);
+    setVideoError(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
   }
 
   // ── Step 1 ─────────────────────────────────────────────────────────────────
@@ -317,33 +370,11 @@ export function OnboardingForm() {
 
   // ── Step 3 ─────────────────────────────────────────────────────────────────
 
-  const step3CanSubmit = Boolean(form.shopName.trim() && form.slug.trim() && form.country);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!step3CanSubmit) return;
-    setLoading(true);
-    setSubmitError(null);
-    try {
-      const res = await fetch("/api/seller/onboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Submission failed");
-      setStep(1); // reset state (success screen shown below)
-      router.push("/seller/dashboard");
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const step3CanContinue = Boolean(form.shopName.trim() && form.slug.trim() && form.country);
 
   function renderStep3() {
     return (
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Set up your shop</h1>
           <p className="mt-1.5 text-sm text-gray-500">Choose a name and URL for your shop. You can update these later.</p>
@@ -404,20 +435,140 @@ export function OnboardingForm() {
           </Field>
         </div>
 
-        {submitError && (
-          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{submitError}</p>
-        )}
-
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={() => setStep(2)}
             className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
             Back
           </button>
-          <button type="submit" disabled={!step3CanSubmit || loading}
+          <button type="button" onClick={() => setStep(4)} disabled={!step3CanContinue}
+            className="flex-1 rounded-lg bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 transition-colors">
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step 4 ─────────────────────────────────────────────────────────────────
+
+  const hasSocialLink = [form.website, form.instagram, form.tiktok, form.youtube, form.facebook].some(v => v.trim());
+  const step4CanSubmit = Boolean(!videoUploading && form.verificationVideoUrl && hasSocialLink);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!step4CanSubmit) return;
+    setLoading(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch("/api/seller/onboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Submission failed");
+      router.push("/seller/dashboard");
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function renderStep4() {
+    return (
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Verify your craft</h1>
+          <p className="mt-1.5 text-sm text-gray-500">
+            Caseros is built on real, handmade goods. To keep it that way, we review every new seller
+            before approving their shop. This usually takes 1–2 hours.
+          </p>
+        </div>
+
+        {/* Video upload */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Workstation video <span className="text-red-500">*</span>
+          </label>
+          <p className="mt-0.5 text-xs text-gray-400">
+            Record a short video (15–60 sec) showing your workspace and tools. This helps us confirm you're a genuine maker.
+          </p>
+
+          <div className="mt-2">
+            {form.verificationVideoUrl ? (
+              <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                <CheckCircle size={16} className="shrink-0 text-green-600" />
+                <p className="min-w-0 flex-1 truncate text-sm text-gray-700">{videoName}</p>
+                <button type="button" onClick={removeVideo}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-400 hover:text-gray-700">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : videoUploading ? (
+              <div className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5">
+                <Loader2 size={16} className="shrink-0 animate-spin text-gray-400" />
+                <p className="text-sm text-gray-500">Uploading {videoName}…</p>
+              </div>
+            ) : (
+              <button type="button" onClick={() => videoInputRef.current?.click()}
+                className="flex items-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-600">
+                <Video size={16} />
+                Upload workstation video
+              </button>
+            )}
+
+            {videoError && <p className="mt-1.5 text-xs text-red-600">{videoError}</p>}
+
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/webm"
+              className="hidden"
+              onChange={e => e.target.files?.[0] && handleVideoSelect(e.target.files[0])}
+            />
+            <p className="mt-1.5 text-xs text-gray-400">MP4 or WebM · max 100 MB</p>
+          </div>
+        </div>
+
+        {/* Social links */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Social media / website <span className="text-red-500">*</span>
+          </label>
+          <p className="mt-0.5 text-xs text-gray-400">
+            At least one link required. Share where buyers (and we) can see your work.
+          </p>
+          <div className="mt-2 space-y-2">
+            {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
+              <div key={key} className="flex items-center gap-2">
+                <span className="w-20 shrink-0 text-xs text-gray-500">{label}</span>
+                <input
+                  type="url"
+                  value={form[key as keyof Pick<FormState, "website" | "instagram" | "tiktok" | "youtube" | "facebook">]}
+                  onChange={e => set({ [key]: e.target.value } as Partial<FormState>)}
+                  placeholder={placeholder}
+                  className={inputCls}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {submitError && (
+          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{submitError}</p>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={() => setStep(3)}
+            className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            Back
+          </button>
+          <button type="submit" disabled={!step4CanSubmit || loading}
             className="flex-1 rounded-lg bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 transition-colors">
             {loading
-              ? <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" />Opening shop…</span>
-              : "Open my shop"}
+              ? <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" />Submitting…</span>
+              : "Submit for review"}
           </button>
         </div>
       </form>
@@ -432,6 +583,7 @@ export function OnboardingForm() {
       {step === 1 && renderStep1()}
       {step === 2 && renderStep2()}
       {step === 3 && renderStep3()}
+      {step === 4 && renderStep4()}
     </div>
   );
 }
